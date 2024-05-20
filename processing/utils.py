@@ -7,6 +7,7 @@ def perform_processing(image: np.ndarray) -> str:
     # TODO: add image processing here
 
     tablica = None
+    result = ''
 
     imscaled = cv2.resize(image, (800, 600))
 
@@ -56,6 +57,8 @@ def perform_processing(image: np.ndarray) -> str:
                 break
 
     if tablica is not None:
+        tablica_rgb = tablica
+        tablica = cv2.cvtColor(tablica, cv2.COLOR_BGR2GRAY)
         cv2.imshow('Warped Image', tablica)
         result = ''
 
@@ -64,9 +67,66 @@ def perform_processing(image: np.ndarray) -> str:
         cv2.imshow('Detected Plate', image)
         cv2.resizeWindow('Detected Plate', 800, 600)
 
+        _, tablica_filtr = cv2.threshold(tablica, 150, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C)
+        tablica_filtr = cv2.erode(tablica_filtr, np.ones((5,5)))
+        tablica_filtr = cv2.dilate(tablica_filtr, np.ones((3,3)))
+
+        tablica_filtr = tablica_filtr[10:105, :]
+
+        first_letter = 0
+        x_scan = np.zeros((tablica_filtr.shape[1]))
+
+        for i in range(0, tablica_filtr.shape[1]):
+            for j in range(0, tablica_filtr.shape[0]):
+                if tablica_filtr[j, i] == 255:
+                    x_scan[i] = True
+                    break
+                else:
+                    x_scan[i] = False
+
+        znaki = []
+        prev = 0
+        for i, val in enumerate(x_scan):
+            if val == 1 and prev == 0:
+                if i-5 < 0:
+                    znaki.append((0,0))
+                else:
+                    znaki.append((i-5, 0))
+            if val == 0 and prev == 1:
+                znaki[-1] = (znaki[-1][0], i+5)
+            prev = val
+
+        #TEMP - przygotowanie zbioru treningowego
+        for i in znaki:
+            size = i[1] - i[0]
+
+            cv2.line(tablica_rgb, (i[0], 0), (i[0], 114), (255, 0, 0), 1)
+            cv2.line(tablica_rgb, (i[1], 0), (i[1], 114), (0, 255, 0), 1)
+
+            litera = tablica_filtr[:, i[0]:i[1]]
+            litera_tmp = np.zeros((95,80))
+            if size < 80:
+                x_position = (80 - size) // 2
+                litera_tmp[:, x_position:x_position+size] = litera
+            else:
+                litera_tmp = litera[:, 0:80]
+
+            cv2.imshow('litera', litera_tmp)
+
+            # Zapis plikow do zbioru treningowego
+            # cv2.waitKey(1)
+            # znak = input('Podaj znak: ')
+            # cv2.destroyWindow('litera')
+            # name = 'train_letters/' + str(znak) + '_' + str(np.random.randint(0, 10000)) + '.png'
+            # cv2.imwrite(name, litera_tmp)
+
+        cv2.imshow('Tablica filtr', tablica_filtr)
+        cv2.imshow('Tablica podzielona', tablica_rgb)
+
         print('Odczytano: ' + result)
+
     else:
         print('Nie znaleziono tablicy!')
 
-    cv2.waitKey(0)
-    return 'PO12345'
+    cv2.waitKey(1)
+    return result
