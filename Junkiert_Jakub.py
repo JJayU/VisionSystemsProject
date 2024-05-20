@@ -24,7 +24,7 @@ def main():
             print(f'Error loading image {image_path}')
             continue
 
-        results[image_path.name] = perform_processing(image)
+        results[image_path.name] = perform_processing(image, image_path)
 
     with results_file.open('w') as output_file:
         json.dump(results, output_file, indent=4)

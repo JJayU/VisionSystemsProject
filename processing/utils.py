@@ -1,8 +1,9 @@
 import numpy as np
 import cv2
 from copy import copy
+import pickle
 
-def perform_processing(image: np.ndarray) -> str:
+def perform_processing(image: np.ndarray, path) -> str:
     # print(f'image.shape: {image.shape}')
     # TODO: add image processing here
 
@@ -113,6 +114,14 @@ def perform_processing(image: np.ndarray) -> str:
 
             cv2.imshow('litera', litera_tmp)
 
+            with open('model.pkl', 'rb') as f:
+                clf2 = pickle.load(f)
+
+            odczyt = clf2.predict([litera_tmp.flatten()])[0]
+
+            if odczyt != '_':
+                result = result + odczyt
+
             # Zapis plikow do zbioru treningowego
             # cv2.waitKey(1)
             # znak = input('Podaj znak: ')
@@ -123,7 +132,16 @@ def perform_processing(image: np.ndarray) -> str:
         cv2.imshow('Tablica filtr', tablica_filtr)
         cv2.imshow('Tablica podzielona', tablica_rgb)
 
-        print('Odczytano: ' + result)
+        dlugosc = len(result)
+        dobre = 0
+        for i in range(0, dlugosc):
+            if result[i] == path.name[i]:
+                dobre += 1
+
+        procent = (dobre / dlugosc) * 100
+
+
+        print('Odczytano: ' + result + ' / ' + path.name[:-4] + ' - ' + str(procent) + '%')
 
     else:
         print('Nie znaleziono tablicy!')
