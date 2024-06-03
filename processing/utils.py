@@ -1,38 +1,44 @@
 import numpy as np
 import cv2
-from copy import copy
 import pickle
 
-def perform_processing(image: np.ndarray, path) -> str:
-    # print(f'image.shape: {image.shape}')
-    # TODO: add image processing here
 
-    tablica = None
+def perform_processing(image: np.ndarray, path) -> str:
+
+    license_plate_img = None
     result = ''
 
-    imscaled = cv2.resize(image, (800, 600))
-
-    # Wstepne przetworzenie obrazu
+    # Initial processing of the image
+    # 1. Convert to grayscale
+    # 2. Apply Gaussian blur
+    # 3. Apply Canny edge detection and dilate the edges
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (11, 11), 1)
-    edged = cv2.Canny(blurred, 20, 250)
+    edged = cv2.Canny(blurred, 40, 150)
     edged = cv2.dilate(edged, np.ones((3,3)), iterations=2)
 
-    # cv2.namedWindow('filtr', cv2.WINDOW_NORMAL)
-    # cv2.imshow('filtr', edged)
-    # cv2.resizeWindow('filtr', 800, 600)
+    # Show Canny edge detection
+    # cv2.namedWindow('canny', cv2.WINDOW_NORMAL)
+    # cv2.imshow('canny', edged)
+    # cv2.resizeWindow('canny', 800, 600)
 
-    # Wykrywanie konturow
+    # Detect contours
     contours, _ = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
-    # Filtracja konturów
+    # Set aspect ratio limits
+    min_ar = 1
+    max_ar = 10
+
+    # Filer the contours
+    # Select only the contours that are rectangles with aspect ratio between min_ar and max_ar and have appropriate area
+    # Select the first contour that meets the criteria and apply perspective transform
     for contour in sorted_contours:
         approx = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
         if len(approx) == 4:
             x, y, w, h = cv2.boundingRect(approx)
             aspect_ratio = float(w) / h
-            if 1 < aspect_ratio < 10 and np.all(approx != 0) and 10**8 > cv2.contourArea(contour) > 10**5:
+            if min_ar < aspect_ratio < max_ar and np.all(approx != 0) and 10**8 > cv2.contourArea(contour) > 10**5:
                 cv2.drawContours(image, [approx], -1, (0, 255, 0), 5)
                 rect = np.zeros((4, 2), dtype="float32")
 
@@ -53,98 +59,116 @@ def perform_processing(image: np.ndarray, path) -> str:
 
                 M = cv2.getPerspectiveTransform(rect, dst)
 
-                tablica = cv2.warpPerspective(image, M, (520, 114))
+                license_plate_img = cv2.warpPerspective(image, M, (520, 114))
 
                 break
 
-    if tablica is not None:
-        tablica_rgb = tablica
-        tablica = cv2.cvtColor(tablica, cv2.COLOR_BGR2GRAY)
-        cv2.imshow('Warped Image', tablica)
-        result = ''
+    # Check if the license plate was detected
+    if license_plate_img is not None:
+        license_plate_img_rgb = license_plate_img
+        license_plate_img = cv2.cvtColor(license_plate_img, cv2.COLOR_BGR2GRAY)
 
-        # Wyświetlanie wyniku
+        # Show license plate
+        cv2.imshow('Warped Image', license_plate_img)
+
+        # Show contour of the license plate on original image
         cv2.namedWindow('Detected Plate', cv2.WINDOW_NORMAL)
         cv2.imshow('Detected Plate', image)
         cv2.resizeWindow('Detected Plate', 800, 600)
 
-        _, tablica_filtr = cv2.threshold(tablica, 150, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C)
-        tablica_filtr = cv2.erode(tablica_filtr, np.ones((5,5)))
-        tablica_filtr = cv2.dilate(tablica_filtr, np.ones((3,3)))
+        # Apply adaptive thresholding and morphological operations to the license plate
+        _, license_plate_filtered = cv2.threshold(license_plate_img, 150, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C)
+        license_plate_filtered = cv2.erode(license_plate_filtered, np.ones((5,5)))
+        license_plate_filtered = cv2.dilate(license_plate_filtered, np.ones((3,3)))
 
-        tablica_filtr = tablica_filtr[10:105, :]
+        # Crop the license plate to remove unwanted parts
+        license_plate_filtered = license_plate_filtered[10:105, :]
 
-        first_letter = 0
-        x_scan = np.zeros((tablica_filtr.shape[1]))
-
-        for i in range(0, tablica_filtr.shape[1]):
-            for j in range(0, tablica_filtr.shape[0]):
-                if tablica_filtr[j, i] == 255:
+        # Scan the license plate to detect the letters
+        x_scan = np.zeros((license_plate_filtered.shape[1]))
+        for i in range(0, license_plate_filtered.shape[1]):
+            for j in range(0, license_plate_filtered.shape[0]):
+                if license_plate_filtered[j, i] == 255:
                     x_scan[i] = True
                     break
                 else:
                     x_scan[i] = False
 
-        znaki = []
+        # Prepare list of detected letters, each with its start and end position
+        characters = []
         prev = 0
         for i, val in enumerate(x_scan):
             if val == 1 and prev == 0:
                 if i-5 < 0:
-                    znaki.append((0,0))
+                    characters.append((0,0))
                 else:
-                    znaki.append((i-5, 0))
+                    characters.append((i-5, 0))
             if val == 0 and prev == 1:
-                znaki[-1] = (znaki[-1][0], i+5)
+                if i+5 < len(x_scan):
+                    characters[-1] = (characters[-1][0], i+5)
+                else:
+                    characters[-1] = (characters[-1][0], len(x_scan)-1)
             prev = val
 
-        #TEMP - przygotowanie zbioru treningowego
-        for i in znaki:
+        # Open OCR model
+        with open('model.pkl', 'rb') as f:
+            ocr_model = pickle.load(f)
+
+        # Iterate over detected letters and predict the letter using the OCR model
+        for i in characters:
+            # Size of the detected letter
             size = i[1] - i[0]
 
-            cv2.line(tablica_rgb, (i[0], 0), (i[0], 114), (255, 0, 0), 1)
-            cv2.line(tablica_rgb, (i[1], 0), (i[1], 114), (0, 255, 0), 1)
+            # Draw lines on the license plate image to show the boundaries of the detected letters
+            cv2.line(license_plate_img_rgb, (i[0], 0), (i[0], 114), (255, 0, 0), 1)
+            cv2.line(license_plate_img_rgb, (i[1], 0), (i[1], 114), (0, 255, 0), 1)
 
-            litera = tablica_filtr[:, i[0]:i[1]]
-            litera_tmp = np.zeros((95,80))
+            # Crop the detected letter and resize it to 80x95 so every letter has the same size
+            char_found = license_plate_filtered[:, i[0]:i[1]]
+            char_to_ocr = np.zeros((95,80))
             if size < 80:
                 x_position = (80 - size) // 2
-                litera_tmp[:, x_position:x_position+size] = litera
+                char_to_ocr[:, x_position:x_position+size] = char_found
             else:
-                litera_tmp = litera[:, 0:80]
+                char_to_ocr = char_found[:, 0:80]
 
-            cv2.imshow('litera', litera_tmp)
+            # Display the detected letter
+            # cv2.imshow('litera', litera_tmp)
 
-            with open('model.pkl', 'rb') as f:
-                clf2 = pickle.load(f)
+            # Predict the letter using the OCR model
+            read_letter = ocr_model.predict([char_to_ocr.flatten()])[0]
 
-            odczyt = clf2.predict([litera_tmp.flatten()])[0]
+            # Ignore the letter if model predicted it as '_' (meaning it is not a valid character)
+            if read_letter != '_':
+                result = result + read_letter
 
-            if odczyt != '_':
-                result = result + odczyt
-
-            # Zapis plikow do zbioru treningowego
+            # Save the detected letter to folder 'train_letters' used to train OCR model
             # cv2.waitKey(1)
-            # znak = input('Podaj znak: ')
+            # char_name = input('Podaj znak: ')
             # cv2.destroyWindow('litera')
-            # name = 'train_letters/' + str(znak) + '_' + str(np.random.randint(0, 10000)) + '.png'
-            # cv2.imwrite(name, litera_tmp)
+            # name = 'train_letters/' + str(char_name) + '_' + str(np.random.randint(0, 10000)) + '.png'
+            # cv2.imwrite(name, char_to_ocr)
 
-        cv2.imshow('Tablica filtr', tablica_filtr)
-        cv2.imshow('Tablica podzielona', tablica_rgb)
+        # Display the filtered license plate and the license plate with boundaries of detected letters
+        cv2.imshow('Tablica filtr', license_plate_filtered)
+        cv2.imshow('Tablica podzielona', license_plate_img_rgb)
 
-        dlugosc = len(result)
-        dobre = 0
-        for i in range(0, dlugosc):
+        # Check how many letters are correct
+        len_of_lp = len(result)
+        correct = 0
+        for i in range(0, len_of_lp):
             if result[i] == path.name[i]:
-                dobre += 1
+                correct += 1
+        if len_of_lp > 0:
+            percentage = (correct / (len(path.name) - 4)) * 100
+        else:
+            percentage = 0
 
-        procent = (dobre / dlugosc) * 100
-
-
-        print('Odczytano: ' + result + ' / ' + path.name[:-4] + ' - ' + str(procent) + '%')
+        print('Odczytano: ' + result + ' / ' + path.name[:-4] + ' - ' + str(percentage) + '%')
 
     else:
         print('Nie znaleziono tablicy!')
 
+    # Uncomment to pause after each image
     cv2.waitKey(1)
     return result

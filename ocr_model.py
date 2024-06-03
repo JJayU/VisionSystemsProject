@@ -1,10 +1,11 @@
 import cv2
-import numpy as np
-from sklearn.model_selection import train_test_split
 from pathlib import Path
 from sklearn.svm import SVC
 import pickle
 
+# This file is used to train OCR model. It reads images from 'train_letters' folder and trains the model using them.
+
+# Path to the folder with images of characters
 images_dir = Path("train_letters")
 
 images_paths = sorted([image_path for image_path in images_dir.iterdir() if image_path.name.endswith('.png')])
@@ -19,18 +20,16 @@ for image_path in images_paths:
         continue
 
     data = image.flatten()
-    # print(image_path.name[0])
-    print(data)
     train_X.append(data)
     train_Y.append(image_path.name[0])
 
     # cv2.imshow('as', image)
     # cv2.waitKey(100)
 
-# print(train_X)
-
+# Train the model
 model = SVC()
 model.fit(train_X, train_Y)
 
-with open('model.pkl','wb') as f:
-    pickle.dump(model,f)
+# Save the model to file
+with open('model.pkl', 'wb') as f:
+    pickle.dump(model, f)
