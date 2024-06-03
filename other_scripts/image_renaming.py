@@ -6,10 +6,10 @@ from pathlib import Path
 # Useful for preparing test dataset
 
 # Folder containing images to rename
-images_dir = Path("train_2")
+images_dir = Path("../train_2")
 
 # Folder to save renamed images
-output_dir = "train_3/"
+output_dir = "../train_3/"
 
 images_paths = sorted([image_path for image_path in images_dir.iterdir()])
 

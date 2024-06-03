@@ -117,7 +117,7 @@ def perform_processing(image: np.ndarray, path) -> str:
             prev = val
 
         # Open OCR model
-        with open('model.pkl', 'rb') as f:
+        with open('models/model.pkl', 'rb') as f:
             ocr_model = pickle.load(f)
 
         # Iterate over detected letters and predict the letter using the OCR model
@@ -176,5 +176,5 @@ def perform_processing(image: np.ndarray, path) -> str:
         print('Nie znaleziono tablicy!')
 
     # Change the waitKey value to 0 in order to pause the program until any key is pressed after every image
-    cv2.waitKey(0)
+    cv2.waitKey(1)
     return result
