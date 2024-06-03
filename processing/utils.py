@@ -38,7 +38,13 @@ def perform_processing(image: np.ndarray, path) -> str:
         if len(approx) == 4:
             x, y, w, h = cv2.boundingRect(approx)
             aspect_ratio = float(w) / h
-            if min_ar < aspect_ratio < max_ar and np.all(approx != 0) and 10**8 > cv2.contourArea(contour) > 10**5:
+
+            correct_ar = min_ar < aspect_ratio < max_ar
+            correct_loc_and_size = np.all(approx != 0)
+            correct_area = 10**8 > cv2.contourArea(contour) > 10**5
+            correct_width = w > image.shape[1]/3
+
+            if correct_ar and correct_loc_and_size and correct_area and correct_width:
                 cv2.drawContours(image, [approx], -1, (0, 255, 0), 5)
                 rect = np.zeros((4, 2), dtype="float32")
 
@@ -169,6 +175,6 @@ def perform_processing(image: np.ndarray, path) -> str:
     else:
         print('Nie znaleziono tablicy!')
 
-    # Uncomment to pause after each image
-    cv2.waitKey(1)
+    # Change the waitKey value to 0 in order to pause the program until any key is pressed after every image
+    cv2.waitKey(0)
     return result
