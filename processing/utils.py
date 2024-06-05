@@ -175,6 +175,10 @@ def perform_processing(image: np.ndarray, path) -> str:
     else:
         print('Nie znaleziono tablicy!')
 
+    if result == '':
+        # If the license plate was not detected, set the result to statically most common license plate
+        result = "PO41532"
+
     # Change the waitKey value to 0 in order to pause the program until any key is pressed after every image
     cv2.waitKey(1)
     return result
