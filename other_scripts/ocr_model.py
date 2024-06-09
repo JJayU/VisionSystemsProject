@@ -1,6 +1,6 @@
 import cv2
 from pathlib import Path
-from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 import pickle
 
 # This file is used to train OCR model. It reads images from 'train_letters' folder and trains the model using them.
@@ -27,7 +27,7 @@ for image_path in images_paths:
     # cv2.waitKey(100)
 
 # Train the model
-model = SVC()
+model = RandomForestClassifier()
 model.fit(train_X, train_Y)
 
 # Save the model to file

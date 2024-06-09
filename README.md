@@ -101,7 +101,7 @@ After creating the dataset, the model can be trained by running the *ocr_model.p
 It loads the images from the *train_letters* folder, converts them to python lists and trains the model using 
 *Scikit-learn*.
 
-The model is simple and uses SVC (Support Vector Classifier).
+The model is simple and uses RandomTreeClassifier.
 
 After fitting, the model is saved to file, which is then loaded in the main script.
 
